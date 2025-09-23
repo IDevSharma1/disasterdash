@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ensure page content doesn't hide under fixed nav */
+html, body, #root { 
+    height: 100%;
+    text-decoration: none;
+ }
+
+/* optional small helper for subtle glass cards */
+.glass {
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+}
+.map-container {
+  height: 100vh;   /* full screen height */
+  width: 100%;     /* full width */
+  margin: 0;       /* remove gaps */
+  padding: 0;
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 12px; /* optional rounded look */
+}
+

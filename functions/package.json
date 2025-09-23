@@ -1,0 +1,12 @@
+{
+  "name": "disasterdash-functions",
+  "version": "1.0.0",
+  "main": "index.js",
+  "engines": { "node": "18" },
+  "dependencies": {
+    "firebase-admin": "^11.10.0",
+    "firebase-functions": "^4.4.0",
+    "axios": "^1.4.0",
+    "openai": "^4.3.0"
+  }
+}
