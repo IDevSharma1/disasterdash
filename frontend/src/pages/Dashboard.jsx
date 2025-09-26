@@ -1,141 +1,158 @@
+// ...existing code...
 // src/pages/Dashboard.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Home, Briefcase, GraduationCap, Utensils } from "lucide-react";
 import { useUser, useAuth, UserButton } from "@clerk/clerk-react";
+import DashboardNavbar from "../components/Navbar";
 import ReportForm from "../components/ReportForm";
-
-// 🌟 Navbar
-function DashboardNavbar() {
-  const { user } = useUser();
-  return (
-    <nav className="fixed top-0 left-0 w-full bg-white/30 backdrop-blur-md shadow-lg z-50">
-      <div className="flex justify-between items-center px-6 py-3">
-        {/* Brand */}
-        <div className="text-xl font-bold text-gray-800 tracking-wide">
-          DisasterDash
-        </div>
-
-        {/* Search Bar */}
-        <div className="hidden md:flex flex-1 mx-6 max-w-lg">
-          <input
-            type="text"
-            placeholder="Search incidents, cities..."
-            className="w-full px-4 py-2 rounded-full bg-white/70 shadow-inner border focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
-          />
-        </div>
-
-        {/* Clerk User Profile */}
-        <div className="flex items-center gap-3">
-          {user && (
-            <span className="hidden sm:block text-gray-800 font-medium">
-              {user.firstName || user.username || "User"}
-            </span>
-          )}
-          <UserButton
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox:
-                  "w-10 h-10 rounded-full border-2 border-gray-300 shadow-md",
-              },
-            }}
-          />
-        </div>
-      </div>
-    </nav>
-  );
-}
-
-// Helper to fly to selected marker
-function FlyTo({ position }) {
-  const map = useMap();
-  useEffect(() => {
-    if (position) {
-      map.flyTo(position, 10, { animate: true, duration: 1.5 });
-    }
-  }, [position, map]);
-  return null;
-}
+import axios from "axios";
 
 function Dashboard() {
-  const [showReportForm, setShowReportForm] = useState(false);
-  const [time, setTime] = useState(new Date());
-  const [selectedPosition, setSelectedPosition] = useState(null);
-  const [incidents, setIncidents] = useState([]);
-  const { user } = useUser();
-  const { getToken } = useAuth();
+  // ...existing state and handlers...
 
-  // Clock
+  // Fetch Indian incidents from Sachet backend
   useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Sync user
-  useEffect(() => {
-    async function syncUser() {
-      if (user) {
-        try {
-          const token = await getToken();
-          await fetch("http://localhost:8000/api/users", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              id: user.id,
-              email: user.emailAddresses[0]?.emailAddress,
-              firstName: user.firstName,
-              lastName: user.lastName,
-            }),
-          });
-        } catch (err) {
-          console.error("User sync failed:", err);
-        }
-      }
-    }
-    syncUser();
-  }, [user, getToken]);
-
-  // Fetch incidents
-  useEffect(() => {
-    async function fetchIncidents() {
+    async function fetchIndiaIncidents() {
       try {
-        const res = await fetch("http://localhost:8000/api/incidents/global");
-        const data = await res.json();
-        const seen = new Set();
-        const deduped = data.filter((i) => {
-          const key = `${i.description}-${i.location?.lat || i.latitude}-${i.location?.lng || i.longitude}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        });
-        setIncidents(
-          deduped.map((i, idx) => ({
-            id: i._id || idx,
-            title: i.title || i.description,
-            desc: i.description,
-            coords: [i.location?.lat || i.latitude || 0, i.location?.lng || i.longitude || 0],
-            severity: i.severity,
-            status: i.status,
-            location: i.location,
-            type: i.type || i.eventtype || "Incident",
-            country: i.country || (i.location?.country || ""),
-            city: i.city || (i.location?.city || ""),
-            state: i.state || "",
-          }))
-        );
+        const res = await axios.get("http://localhost:8000/incidents/india");
+        if (res.data && Array.isArray(res.data.incidents)) {
+          setIncidents(prev => {
+            // Avoid duplicates by title+timestamp
+            const existingKeys = new Set(prev.map(i => `${i.title}-${i.timestamp || ''}`));
+            const newIncidents = res.data.incidents.filter(i => !existingKeys.has(`${i.title}-${i.timestamp || ''}`)).map(i => ({
+              id: `india-${i.title}-${i.timestamp}`,
+              title: i.title,
+              desc: i.description,
+              coords: [i.location?.lat || 22, i.location?.lng || 78],
+              severity: "moderate",
+              status: "live",
+              location: {},
+              type: "India Alert",
+              country: "India",
+              city: "",
+              state: "",
+              timestamp: i.timestamp || i.published,
+            }));
+            return [...newIncidents, ...prev];
+          });
+        }
       } catch (err) {
-        console.error("Incident fetch failed:", err);
+        // Ignore fetch errors for now
       }
     }
-    fetchIncidents();
+    fetchIndiaIncidents();
   }, []);
 
-  // WebSocket updates
+  // ...rest of Dashboard component code...
+}
+
+// src/pages/Dashboard.jsx
+import { useEffect, useState, useRef } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { Home, Briefcase, GraduationCap, Utensils } from "lucide-react";
+import { useUser, useAuth, UserButton } from "@clerk/clerk-react";
+import DashboardNavbar from "../components/Navbar";
+import ReportForm from "../components/ReportForm";
+
+function Dashboard() {
+  // Add incident to list after report
+  function handleIncidentAdded(newIncident) {
+    setIncidents((prev) => [
+      {
+        id: newIncident.id || prev.length,
+        title: newIncident.title,
+        desc: newIncident.description,
+        coords: [newIncident.location.lat, newIncident.location.lng],
+        severity: newIncident.severity,
+        status: newIncident.status || 'pending',
+        location: newIncident.location,
+        type: newIncident.type || 'Incident',
+        country: newIncident.location.country || '',
+        city: newIncident.location.city || '',
+        state: newIncident.location.state || '',
+      },
+      ...prev,
+    ]);
+  }
+
+  // Custom marker icons for severity
+  const markerIcons = {
+    critical: L.icon({
+      iconUrl:
+        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+      shadowSize: [41, 41],
+    }),
+    moderate: L.icon({
+      iconUrl:
+        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-yellow.png",
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+      shadowSize: [41, 41],
+    }),
+    normal: L.icon({
+      iconUrl:
+        "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-white.png",
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [1, -34],
+      shadowUrl:
+        "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+      shadowSize: [41, 41],
+    }),
+  };
+
+  // Gemini stub: fetch images/videos for incident
+  async function fetchGeminiMedia(incident) {
+    // Replace with Gemini API call for real implementation
+    // For now, return static demo assets
+    return {
+      images: [
+        "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80",
+        "https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80",
+      ],
+      videos: [
+        "https://www.w3schools.com/html/mov_bbb.mp4"
+      ]
+    };
+  }
+
+  const [incidents, setIncidents] = useState([]);
+  const [activeIncident, setActiveIncident] = useState(null);
+  const [media, setMedia] = useState({ images: [], videos: [] });
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [selectedPosition, setSelectedPosition] = useState(null);
+  const [time, setTime] = useState(new Date());
+  const { user } = useUser();
+
+  // When activeIncident changes, fetch media
+  useEffect(() => {
+    if (activeIncident) {
+      fetchGeminiMedia(activeIncident).then(setMedia);
+    } else {
+      setMedia({ images: [], videos: [] });
+    }
+  }, [activeIncident]);
+
+  // Update time every second
+  useEffect(() => {
+    const interval = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // WebSocket for live incidents
   useEffect(() => {
     const ws = new window.WebSocket("ws://localhost:8000/ws/incidents");
     ws.onmessage = (event) => {
@@ -188,16 +205,60 @@ function Dashboard() {
             opacity={0.4}
           />
           {incidents.map((i) => (
-            <Marker key={i.id} position={i.coords}>
-              <Popup>
-                <strong>{i.type}</strong>
-                <br />
-                {i.desc}
-              </Popup>
-            </Marker>
+            <Marker
+              key={i.id}
+              position={i.coords}
+              icon={markerIcons[i.severity?.toLowerCase() || "normal"]}
+              eventHandlers={{
+                click: () => setActiveIncident(i),
+                mouseover: () => setActiveIncident(i),
+              }}
+            />
           ))}
           <FlyTo position={selectedPosition} />
         </MapContainer>
+        {/* Incident Details Popup */}
+        {activeIncident && (
+          <div
+            className="fixed top-1/2 left-1/2 z-50 bg-white/90 rounded-2xl shadow-xl p-6 min-w-[340px] max-w-[90vw]"
+            style={{ transform: "translate(-50%, -50%)", backdropFilter: "blur(12px)" }}
+          >
+            <button
+              className="absolute top-2 right-3 text-gray-400 hover:text-gray-700 text-2xl"
+              onClick={() => setActiveIncident(null)}
+            >
+              &times;
+            </button>
+            <h2 className="text-xl font-bold mb-2">{activeIncident.title || activeIncident.type}</h2>
+            <div className="mb-2 text-gray-700">{activeIncident.desc}</div>
+            <div className="mb-2 text-sm text-gray-600">
+              <strong>Location:</strong> {activeIncident.city}, {activeIncident.state}, {activeIncident.country}
+            </div>
+            <div className="mb-2 text-sm text-gray-600">
+              <strong>Severity:</strong> {activeIncident.severity}
+            </div>
+            <div className="mb-2 text-sm text-gray-600">
+              <strong>Deaths:</strong> {activeIncident.deaths || "Unknown"} <br />
+              <strong>Loss Worth:</strong> {activeIncident.lossWorth ? `₹${activeIncident.lossWorth}` : "Unknown"}
+            </div>
+            <div className="mb-2">
+              <strong>Images:</strong>
+              <div className="flex gap-2 mt-1">
+                {media.images.map((img, idx) => (
+                  <img key={idx} src={img} alt="Incident" className="w-24 h-16 object-cover rounded shadow" />
+                ))}
+              </div>
+            </div>
+            <div className="mb-2">
+              <strong>Videos:</strong>
+              <div className="flex gap-2 mt-1">
+                {media.videos.map((vid, idx) => (
+                  <video key={idx} src={vid} controls className="w-32 h-20 rounded shadow" />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 📌 Left Sticky Panel */}
@@ -252,7 +313,7 @@ function Dashboard() {
             >
               &times;
             </button>
-            <ReportForm user={user} />
+            <ReportForm user={user} onIncidentAdded={handleIncidentAdded} />
           </div>
         </div>
       )}

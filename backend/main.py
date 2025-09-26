@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import asyncio
@@ -8,11 +8,13 @@ from admin import router as admin_router
 from ws import router as ws_router
 from users import router as users_router
 from ai_service import fetch_incidents_from_ai
+from sachet import router as sachet_router
 
 # === Logging ===
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="DisasterDash Backend")
+router = APIRouter()
 
 # === CORS for frontend ===
 app.add_middleware(
@@ -28,6 +30,7 @@ app.include_router(incidents_router)
 app.include_router(admin_router)
 app.include_router(ws_router)
 app.include_router(users_router)
+app.include_router(sachet_router)
 
 @app.on_event("startup")
 async def startup_event():
